@@ -43,8 +43,3 @@ QA verifies:   Close  → Closed
 * Passwords are hashed; CSRF token on every form; uploads limited to 5 files × 10 MB, safe extensions only.
 * Set `TESTBOARD_SECRET` env var in production; use a real WSGI server (gunicorn/waitress) instead of `python app.py`.
 * The old `index.html` mock-up was removed – the Flask app replaces it.
-
-## Hosting (short)
-* Start command on a server: `gunicorn app:app` (Linux hosts) – on PythonAnywhere use the WSGI file with `from app import app as application`.
-* The app needs a **persistent disk** (SQLite file `testboard.db` + `uploads/` folder). Free hosts with temporary disks will lose data.
-* First start creates `shahrukh / 41955` (admin). Change the password after login, or run `python seed_data.py` once for demo data.
