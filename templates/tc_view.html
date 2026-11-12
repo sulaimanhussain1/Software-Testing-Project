@@ -1,0 +1,52 @@
+{% extends "layout.html" %}
+{% from "macros.html" import csrf, sev_badge, status_badge, result_badge, files, icon with context %}
+{% set back = url_for('admin_test_cases') if g.user.role == 'admin' else url_for('qa_test_cases') %}
+{% block page_title %}TC-{{ '%03d'|format(tc.id) }}{% endblock %}
+{% block page_subtitle %}{{ tc.title }}{% endblock %}
+{% block page_action %}
+  <a href="{{ back }}" class="topbar-btn btn-ghost">{{ icon('back') }} Back</a>
+  {% if can_edit %}<a href="{{ url_for('tc_edit', tc_id=tc.id) }}" class="topbar-btn btn-ghost">Edit</a>{% endif %}
+  {% if can_execute %}<a href="{{ url_for('qa_execute', tc_id=tc.id) }}" class="topbar-btn btn-primary">Run test</a>{% endif %}
+{% endblock %}
+{% block content %}
+<div class="detail-grid">
+  <div class="stack">
+    <div class="card"><div class="card-body">
+      <div class="h-sub">Steps</div><div class="block pre">{{ tc.steps or '—' }}</div>
+      <div class="h-sub">Expected result</div><div class="block green">{{ tc.expected or '—' }}</div>
+    </div></div>
+
+    <div class="card"><div class="card-header"><div class="card-title">Execution history</div></div>
+      <div class="card-body">
+      {% for e in executions %}
+        <div class="event"><div class="ev-ico ev-{{ 'closed' if e.status=='Pass' else 'reopened' if e.status=='Fail' else 'started' if e.status=='Blocked' else 'comment' }}">{{ e.status[0] }}</div>
+          <div class="ev-body">
+            <div class="ev-head">{{ result_badge(e.status) }} <b>{{ e.tester or 'Unknown' }}</b>
+              <span class="muted">· build {{ e.build or '—' }}</span><time>{{ e.executed_at|dt }}</time></div>
+            {% if e.actual or e.notes %}<div class="ev-text">{{ e.actual }}{% if e.notes %}{{ '\n' if e.actual }}{{ e.notes }}{% endif %}</div>{% endif %}
+            {{ files(exec_files.get(e.id)) }}
+          </div></div>
+      {% else %}<div class="empty-inline">Not executed yet.</div>{% endfor %}
+      </div></div>
+  </div>
+
+  <div class="stack">
+    <div class="card"><div class="card-body"><dl class="kv">
+      <dt>Module</dt><dd><span class="module-tag">{{ tc.module }}</span></dd>
+      <dt>Priority</dt><dd>{{ sev_badge(tc.priority) }}</dd>
+      <dt>Assigned QA</dt><dd>{{ tc.qa_name or '— unassigned —' }}</dd>
+      <dt>Due</dt><dd>{{ tc.due_date|d if tc.due_date else '—' }}</dd>
+      <dt>Created by</dt><dd>{{ tc.creator or '—' }}</dd>
+      <dt>Created</dt><dd>{{ tc.created_at|dt }}</dd>
+    </dl></div></div>
+    <div class="card"><div class="card-header"><div class="card-title">Linked bugs</div></div>
+      <div class="card-body">
+      {% for b in bugs %}
+        <div style="margin-bottom:10px"><span class="mono">{{ b.bug_code }}</span> {{ status_badge(b.status) }}<br>
+          <a class="link-strong small" href="{{ url_for('bug_detail', bug_id=b.id) }}">{{ b.title|truncate(50) }}</a>
+          <div class="muted small">Dev: {{ b.developer or 'unassigned' }}</div></div>
+      {% else %}<div class="muted small">No bugs linked.</div>{% endfor %}
+      </div></div>
+  </div>
+</div>
+{% endblock %}

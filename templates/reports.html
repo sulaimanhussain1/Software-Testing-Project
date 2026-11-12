@@ -1,0 +1,118 @@
+{% extends "layout.html" %}
+{% from "macros.html" import sev_badge, status_badge, result_badge, icon with context %}
+{% set qs = {'build': f.build, 'module': f.module, 'from': f.date_from, 'to': f.date_to} %}
+{% block page_title %}Report Dashboard{% endblock %}
+{% block page_subtitle %}{{ 'Your assigned bugs' if is_dev else 'Test execution & bug analytics' }}{% endblock %}
+{% block page_action %}
+  <a href="{{ url_for('reports_export', type='bugs', **qs) }}" class="topbar-btn btn-ghost">{{ icon('download') }} Bugs CSV</a>
+  {% if not is_dev %}<a href="{{ url_for('reports_export', type='executions', **qs) }}" class="topbar-btn btn-ghost">{{ icon('download') }} Executions CSV</a>
+  <a href="{{ url_for('reports_export', type='test_cases') }}" class="topbar-btn btn-ghost">{{ icon('download') }} Test cases CSV</a>{% endif %}
+{% endblock %}
+
+{% block content %}
+<form method="get" class="filter-bar">
+  {% if not is_dev %}
+  <select name="build" class="form-control" onchange="this.form.submit()"><option value="">All builds</option>
+    {% for b in builds %}<option {{ 'selected' if f.build == b }}>{{ b }}</option>{% endfor %}</select>
+  {% endif %}
+  <select name="module" class="form-control" onchange="this.form.submit()"><option value="">All modules</option>
+    {% for m in modules %}<option {{ 'selected' if f.module == m }}>{{ m }}</option>{% endfor %}</select>
+  <label class="small muted">From</label><input class="form-control" type="date" name="from" value="{{ f.date_from }}" onchange="this.form.submit()">
+  <label class="small muted">To</label><input class="form-control" type="date" name="to" value="{{ f.date_to }}" onchange="this.form.submit()">
+  {% if f.build or f.module or f.date_from or f.date_to %}<a class="btn btn-outline" href="{{ url_for('reports') }}">Clear filters</a>{% endif %}
+</form>
+
+<div class="stats-grid">
+  {% if not is_dev %}
+  <div class="stat-card"><div class="stat-label">Executions</div><div class="stat-value">{{ ex_total }}</div><div class="stat-sub">{{ ex.Pass }} pass · {{ ex.Fail }} fail · {{ ex.Blocked }} blocked</div></div>
+  <div class="stat-card"><div class="stat-label">Pass rate</div><div class="stat-value" style="color:var(--pass)">{{ ex_rate }}%</div><div class="stat-sub">of all executions in range</div></div>
+  {% endif %}
+  <div class="stat-card"><div class="stat-label">Bugs</div><div class="stat-value">{{ total_bugs }}</div><div class="stat-sub">{{ total_bugs - bug_status.Closed }} still open</div></div>
+  <div class="stat-card"><div class="stat-label">Closed</div><div class="stat-value" style="color:var(--pass)">{{ bug_status.Closed }}</div><div class="stat-sub">{{ bug_status.Fixed }} awaiting QA verification</div></div>
+  <div class="stat-card"><div class="stat-label">Reopened</div><div class="stat-value" style="color:var(--fail)">{{ bug_status.Reopened }}</div><div class="stat-sub">currently reopened</div></div>
+</div>
+
+<div class="grid-chart {{ "" if is_dev else "two" }}">
+  {% if not is_dev %}
+  <div class="card"><div class="card-header"><div class="card-title">Execution results</div></div><div class="card-body"><div class="chart-box"><canvas id="cEx"></canvas></div></div></div>
+  {% endif %}
+  <div class="card"><div class="card-header"><div class="card-title">Bugs by status</div></div><div class="card-body"><div class="chart-box"><canvas id="cSt"></canvas></div></div></div>
+  <div class="card"><div class="card-header"><div class="card-title">Bugs by severity</div></div><div class="card-body"><div class="chart-box"><canvas id="cSev"></canvas></div></div></div>
+  <div class="card"><div class="card-header"><div class="card-title">Bugs by module</div></div><div class="card-body"><div class="chart-box"><canvas id="cMod"></canvas></div></div></div>
+</div>
+
+{% if not is_dev %}
+<div class="grid-2 mb" style="align-items:start">
+  <div class="card"><div class="card-header"><div class="card-title">Execution results by module</div></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Module</th><th>Runs</th><th>Pass</th><th>Fail</th><th>Blocked</th><th>Skip</th><th style="width:130px">Pass rate</th></tr></thead>
+      <tbody>
+      {% for m in ex_by_module %}
+        {% set pr = (m.passed / m.total * 100)|round|int %}
+        <tr><td><span class="module-tag">{{ m.module }}</span></td><td>{{ m.total }}</td><td>{{ m.passed }}</td><td>{{ m.failed }}</td><td>{{ m.blocked }}</td><td>{{ m.skipped }}</td>
+          <td><div class="progress-wide"><span style="width:{{ pr }}%;background:var(--pass)"></span></div><span class="small muted">{{ pr }}%</span></td></tr>
+      {% else %}<tr><td colspan="7" class="empty-inline">No executions in this range.</td></tr>{% endfor %}
+      </tbody></table></div></div>
+  <div class="card"><div class="card-header"><div class="card-title">Bugs by module</div></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Module</th><th>Total</th><th>Open</th><th>Closed</th></tr></thead>
+      <tbody>{% for m in bug_mod %}<tr><td><span class="module-tag">{{ m.module }}</span></td><td>{{ m.total }}</td><td>{{ m.open }}</td><td>{{ m.closed }}</td></tr>
+      {% else %}<tr><td colspan="4" class="empty-inline">No bugs.</td></tr>{% endfor %}</tbody></table></div></div>
+</div>
+
+{% if g.user.role == 'admin' %}
+<div class="grid-2 mb" style="align-items:start">
+  <div class="card"><div class="card-header"><div class="card-title">Developer performance</div>
+      <a class="btn btn-sm btn-outline" href="{{ url_for('reports_export', type='team') }}">{{ icon('download') }} CSV</a></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Developer</th><th>Active</th><th>Awaiting QA</th><th>Closed</th><th>Reopens</th><th>Avg fix</th></tr></thead>
+      <tbody>{% for d in devs %}<tr><td>{{ d.full_name }}</td><td>{{ d.active }}</td><td>{{ d.awaiting }}</td><td>{{ d.closed }}</td><td>{{ d.reopens }}</td>
+        <td class="muted small">{{ '%.1f h'|format(d.avg_hours) if d.avg_hours is not none else '—' }}</td></tr>
+      {% else %}<tr><td colspan="6" class="empty-inline">No developers.</td></tr>{% endfor %}</tbody></table></div></div>
+  <div class="card"><div class="card-header"><div class="card-title">QA performance</div></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>QA Tester</th><th>Assigned</th><th>Pending</th><th>Executed</th><th>Bugs reported</th></tr></thead>
+      <tbody>{% for q in qas %}<tr><td>{{ q.full_name }}</td><td>{{ q.assigned }}</td><td>{{ q.pending }}</td><td>{{ q.executed }}</td><td>{{ q.reported }}</td></tr>
+      {% else %}<tr><td colspan="5" class="empty-inline">No QA testers.</td></tr>{% endfor %}</tbody></table></div></div>
+</div>
+{% endif %}
+{% endif %}
+
+<div class="card mb">
+  <div class="card-header"><div class="card-title">Bug list</div><span class="muted small">latest 200</span></div>
+  <div class="table-wrap"><table id="bugTable">
+    <thead><tr><th>Bug</th><th>Title</th><th>Module</th><th>Severity</th><th>Status</th><th>Reported by</th><th>Developer</th><th>Reported</th><th>Closed</th></tr></thead>
+    <tbody>
+    {% for b in bugs %}
+      <tr><td class="mono"><a href="{{ url_for('bug_detail', bug_id=b.id) }}">{{ b.bug_code }}</a></td><td>{{ b.title|truncate(48) }}</td>
+        <td><span class="module-tag">{{ b.module }}</span></td><td>{{ sev_badge(b.severity) }}</td><td>{{ status_badge(b.status) }}</td>
+        <td class="small muted">{{ b.reporter or '—' }}</td><td class="small muted">{{ b.developer or '—' }}</td>
+        <td class="small muted nowrap">{{ b.created_at|d }}</td><td class="small muted nowrap">{{ b.closed_at|d if b.closed_at else '—' }}</td></tr>
+    {% else %}<tr><td colspan="9" class="empty-inline">No bugs in this range.</td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+
+{% if not is_dev %}
+<div class="card">
+  <div class="card-header"><div class="card-title">Execution log</div><span class="muted small">latest 200</span></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Test case</th><th>Module</th><th>Result</th><th>Build</th><th>Tester</th><th>Actual result</th><th>Date</th></tr></thead>
+    <tbody>
+    {% for e in executions %}
+      <tr><td><a class="link-strong" href="{{ url_for('tc_view', tc_id=e.test_case_id) }}">TC-{{ '%03d'|format(e.test_case_id) }}</a> <span class="muted small">{{ e.title|truncate(34) }}</span></td>
+        <td><span class="module-tag">{{ e.module }}</span></td><td>{{ result_badge(e.status) }}</td>
+        <td class="small muted">{{ e.build or '—' }}</td><td class="small muted">{{ e.tester or '—' }}</td>
+        <td class="small muted">{{ (e.actual or '—')|truncate(50) }}</td><td class="small muted nowrap">{{ e.executed_at|dt }}</td></tr>
+    {% else %}<tr><td colspan="7" class="empty-inline">No executions in this range.</td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}{% include "_charts.html" %}
+<script>
+  {% if not is_dev %}donut('cEx', {{ ex|tojson }});{% endif %}
+  donut('cSt', {{ bug_status|tojson }});
+  bars('cSev', {{ bug_sev.keys()|list|tojson }}, {{ bug_sev.values()|list|tojson }}, ['#ef4444','#f97316','#eab308','#22c55e']);
+  bars('cMod', {{ bug_mod|map(attribute='module')|list|tojson }}, {{ bug_mod|map(attribute='total')|list|tojson }}, '{{ "#6c5ce7" if g.user.role == "qa" else "#2563eb" if g.user.role == "dev" else "#0f766e" }}', true);
+</script>{% endblock %}

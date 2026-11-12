@@ -1,0 +1,82 @@
+{% extends "layout.html" %}
+{% from "macros.html" import csrf, sev_badge, result_badge, status_badge, upload_field, icon with context %}
+{% block page_title %}Run Test Case{% endblock %}
+{% block page_subtitle %}TC-{{ '%03d'|format(tc.id) }} · record the result, report a bug and upload evidence{% endblock %}
+{% block page_action %}<a href="{{ url_for('qa_test_cases') }}" class="topbar-btn btn-ghost">{{ icon('back') }} Back</a>{% endblock %}
+{% block content %}
+<div class="grid-2" style="align-items:start">
+  <div class="stack">
+    <div class="card"><div class="card-header"><div class="card-title">{{ tc.title }}</div>{{ sev_badge(tc.priority) }}</div>
+      <div class="card-body">
+        <span class="module-tag">{{ tc.module }}</span>
+        <div class="h-sub" style="margin-top:14px">Steps</div><div class="block pre">{{ tc.steps or '—' }}</div>
+        <div class="h-sub">Expected result</div><div class="block green">{{ tc.expected or '—' }}</div>
+      </div></div>
+    {% if open_bugs %}
+    <div class="card"><div class="card-header"><div class="card-title">Open bugs on this test case</div></div><div class="card-body">
+      {% for b in open_bugs %}<div style="margin-bottom:8px"><span class="mono">{{ b.bug_code }}</span> {{ status_badge(b.status) }}
+        <a class="link-strong small" href="{{ url_for('bug_detail', bug_id=b.id) }}">{{ b.title|truncate(46) }}</a></div>{% endfor %}
+      <div class="muted small">Re-testing after a fix? Mark Pass here, then close the bug from its page.</div></div></div>
+    {% endif %}
+    {% if history %}
+    <div class="card"><div class="card-header"><div class="card-title">Previous runs</div></div><div class="card-body">
+      {% for e in history %}<div style="margin-bottom:8px;font-size:.82rem">{{ result_badge(e.status) }} <span class="muted">{{ e.tester }} · {{ e.build or '—' }} · {{ e.executed_at|dt }}</span></div>{% endfor %}
+    </div></div>{% endif %}
+  </div>
+
+  <div class="card"><div class="card-header"><div class="card-title">Record result</div></div><div class="card-body">
+    <form method="post" enctype="multipart/form-data" id="runForm">
+      {{ csrf() }}
+      <div class="form-group" style="margin-bottom:16px"><label>Result *</label>
+        <div class="status-selector">
+          {% for s, ico in [('Pass','✓'),('Fail','✗'),('Blocked','⊘'),('Skip','→')] %}
+          <input type="radio" name="status" id="s-{{ s|lower }}" value="{{ s }}" class="status-option" required {{ 'checked' if form.status == s }}>
+          <label for="s-{{ s|lower }}" class="status-label {{ s|lower }}-label"><span class="sl-icon">{{ ico }}</span> {{ s }}</label>
+          {% endfor %}
+        </div></div>
+      <div class="form-grid" style="margin-bottom:14px">
+        <div class="form-group"><label>Build / version</label><input class="form-control" name="build" value="{{ form.build or '' }}" placeholder="e.g. v1.4.2"></div>
+        <div class="form-group"><label>Executed by</label><input class="form-control" value="{{ g.user.full_name }}" disabled></div>
+      </div>
+      <div class="form-group" style="margin-bottom:14px"><label>Actual result</label>
+        <textarea class="form-control" name="actual" rows="3" placeholder="What actually happened?">{{ form.actual or '' }}</textarea></div>
+      <div class="form-group" style="margin-bottom:14px"><label>Notes</label>
+        <textarea class="form-control" name="notes" rows="2">{{ form.notes or '' }}</textarea></div>
+      <div style="margin-bottom:14px">{{ upload_field('Upload evidence (screenshots, logs, recordings)') }}</div>
+
+      <div class="bug-box" id="bugBox" style="display:none">
+        <h4>{{ icon('bug') }} Report a bug for the developer team</h4>
+        <label class="check-row"><input type="checkbox" name="report_bug" value="1" id="reportBug" checked> Create a bug report from this failure</label>
+        <div id="bugFields">
+          <div class="form-grid">
+            <div class="form-group full"><label>Bug title *</label><input class="form-control" name="bug_title" value="{{ form.bug_title or '' }}"></div>
+            <div class="form-group"><label>Module *</label><input class="form-control" name="bug_module" value="{{ form.bug_module or '' }}"></div>
+            <div class="form-group"><label>Severity</label>
+              <select class="form-control" name="severity">{% for s in SEVERITIES %}<option {{ 'selected' if form.severity == s }}>{{ s }}</option>{% endfor %}</select></div>
+            <div class="form-group full"><label>Steps to reproduce</label><textarea class="form-control" name="bug_steps" rows="3">{{ form.bug_steps or '' }}</textarea></div>
+            <div class="form-group full"><label>Expected result</label><textarea class="form-control" name="bug_expected" rows="2">{{ form.bug_expected or '' }}</textarea></div>
+          </div>
+          <div class="form-hint" style="margin-top:8px">The actual result above is copied into the bug. The admin will assign it to a developer.</div>
+        </div>
+      </div>
+
+      <div class="form-actions" style="margin-top:18px;display:flex;gap:10px">
+        <button class="btn btn-accent btn-big" type="submit">Save result</button>
+        <a class="btn btn-outline btn-big" href="{{ url_for('qa_test_cases') }}">Cancel</a>
+      </div>
+    </form>
+  </div></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  const box = document.getElementById('bugBox'), chk = document.getElementById('reportBug'), fields = document.getElementById('bugFields');
+  function sync() {
+    const s = document.querySelector('input[name=status]:checked');
+    box.style.display = (s && (s.value === 'Fail' || s.value === 'Blocked')) ? 'block' : 'none';
+    fields.style.display = chk.checked ? 'block' : 'none';
+  }
+  document.querySelectorAll('input[name=status]').forEach(r => r.addEventListener('change', sync));
+  chk.addEventListener('change', sync); sync();
+</script>
+{% endblock %}

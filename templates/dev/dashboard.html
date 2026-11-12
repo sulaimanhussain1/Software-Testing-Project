@@ -1,0 +1,43 @@
+{% extends "layout.html" %}
+{% from "macros.html" import sev_badge, status_badge with context %}
+{% block page_title %}Developer Dashboard{% endblock %}
+{% block page_subtitle %}Hello {{ g.user.full_name.split()[0] }} · bugs assigned to you{% endblock %}
+{% block page_action %}<a href="{{ url_for('dev_bugs') }}" class="topbar-btn btn-primary">My Bugs</a>{% endblock %}
+{% block content %}
+<div class="stats-grid">
+  <div class="stat-card {{ 'alert' if st.Reopened }}"><div class="stat-label">To fix now</div><div class="stat-value" style="color:var(--fail)">{{ active }}</div>
+    <div class="stat-sub">{{ st.Reopened }} reopened · {{ st['In Progress'] }} in progress</div></div>
+  <div class="stat-card"><div class="stat-label">Waiting for QA</div><div class="stat-value" style="color:#0891b2">{{ st.Fixed }}</div>
+    <div class="stat-sub">Fixed, awaiting verification</div></div>
+  <div class="stat-card"><div class="stat-label">Closed</div><div class="stat-value" style="color:var(--pass)">{{ st.Closed }}</div>
+    <div class="stat-sub">Verified by QA</div></div>
+  <div class="stat-card"><div class="stat-label">Avg time to fix</div>
+    <div class="stat-value">{{ '%.1f'|format(me.avg_hours) if me and me.avg_hours is not none else '—' }}<small style="font-size:.9rem"> {{ 'h' if me and me.avg_hours is not none }}</small></div>
+    <div class="stat-sub">{{ me.reopens if me else 0 }} reopen(s) so far</div></div>
+</div>
+
+<div class="card mb">
+  <div class="card-header"><div class="card-title">My work queue</div><a class="btn btn-sm btn-outline" href="{{ url_for('dev_bugs') }}">View all</a></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Bug</th><th>Module</th><th>Severity</th><th>Status</th><th>Reported by</th><th></th></tr></thead>
+    <tbody>
+    {% for b in queue %}
+      <tr class="{{ 'row-danger' if b.status == 'Reopened' }}">
+        <td><span class="mono">{{ b.bug_code }}</span><br><a class="link-strong" href="{{ url_for('bug_detail', bug_id=b.id) }}">{{ b.title|truncate(60) }}</a></td>
+        <td><span class="module-tag">{{ b.module }}</span></td><td>{{ sev_badge(b.severity) }}</td><td>{{ status_badge(b.status) }}</td>
+        <td class="small muted">{{ b.reporter or '—' }}</td>
+        <td><a class="btn btn-xs btn-accent" href="{{ url_for('bug_detail', bug_id=b.id) }}">Open</a></td></tr>
+    {% else %}<tr><td colspan="6" class="empty-inline">No bugs assigned right now. 🎉</td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+
+<div class="grid-chart">
+  <div class="card"><div class="card-header"><div class="card-title">My bugs by status</div></div><div class="card-body"><div class="chart-box"><canvas id="cSt"></canvas></div></div></div>
+  <div class="card"><div class="card-header"><div class="card-title">To fix by severity</div></div><div class="card-body"><div class="chart-box"><canvas id="cSev"></canvas></div></div></div>
+</div>
+{% endblock %}
+{% block scripts %}{% include "_charts.html" %}
+<script>
+  donut('cSt', {{ st|tojson }});
+  bars('cSev', {{ sev.keys()|list|tojson }}, {{ sev.values()|list|tojson }}, ['#ef4444','#f97316','#eab308','#22c55e']);
+</script>{% endblock %}

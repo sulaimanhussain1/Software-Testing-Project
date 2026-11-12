@@ -1,0 +1,10 @@
+{% extends "layout.html" %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="card"><div class="error-page">
+  <div class="code">{{ code }}</div>
+  <h3>{{ title }}</h3>
+  <p class="muted" style="margin:8px 0 20px">{{ message }}</p>
+  <a class="btn btn-accent" href="{{ url_for('home') }}">Go to my dashboard</a>
+</div></div>
+{% endblock %}

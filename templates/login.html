@@ -1,0 +1,59 @@
+{% from "macros.html" import csrf, icon, theme_btn with context %}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign in · TestBoard</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect rx='20' width='100' height='100' fill='%236c5ce7'/><text y='.78em' x='15' font-size='60' fill='white'>✓</text></svg>" />
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}" />
+</head>
+<body class="login-page">
+  {{ theme_btn("login-theme") }}
+
+  <section class="login-hero">
+    <div class="brand-logo">
+      <div class="brand-icon" style="background:rgba(255,255,255,.2)">{{ icon('check') }}</div>
+      <h1>TestBoard</h1>
+    </div>
+    <div>
+      <h2>Test, report, fix and verify — in one place.</h2>
+      <p class="lead">One login, three workspaces. Everyone sees only what they need.</p>
+      <div class="role-cards">
+        <div class="role-card"><i class="role-dot" style="background:#5eead4"></i><div><b>Admin Panel</b><span>Creates users, assigns test cases to QA and bugs to developers, tracks everything.</span></div></div>
+        <div class="role-card"><i class="role-dot" style="background:#c4b5fd"></i><div><b>QA Mode</b><span>Runs assigned test cases, reports bugs with screenshots, then closes or reopens fixes.</span></div></div>
+        <div class="role-card"><i class="role-dot" style="background:#93c5fd"></i><div><b>Developer Mode</b><span>Gets assigned bugs, marks them fixed with a comment and upload.</span></div></div>
+      </div>
+    </div>
+    <small style="opacity:.6">Manual testing &amp; bug tracking</small>
+  </section>
+
+  <section class="login-pane">
+    <div class="login-box">
+      <h3>Welcome back</h3>
+      <p class="sub">Sign in with the account your admin created for you.</p>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+          <div class="flash flash-{{ category }}" style="margin-bottom:14px">{{ message }}</div>
+        {% endfor %}
+      {% endwith %}
+
+      <form method="post" autocomplete="on">
+        {{ csrf() }}
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input class="form-control" id="username" name="username" value="{{ username or '' }}" autofocus required autocomplete="username" />
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input class="form-control" id="password" type="password" name="password" required autocomplete="current-password" />
+        </div>
+        <button class="btn btn-accent" type="submit">Sign in</button>
+      </form>
+    </div>
+  </section>
+
+</body>
+</html>

@@ -1,0 +1,38 @@
+{% extends "layout.html" %}
+{% from "macros.html" import sev_badge, result_badge, icon with context %}
+{% block page_title %}My Test Cases{% endblock %}
+{% block page_subtitle %}Assigned to you by the admin – run them and report results{% endblock %}
+{% block page_action %}<a href="{{ url_for('tc_new') }}" class="topbar-btn btn-primary">{{ icon('plus') }} New Test Case</a>{% endblock %}
+{% block content %}
+<div class="tabs">
+  <a class="tab {{ 'active' if not f.state }}" href="{{ url_for('qa_test_cases') }}">All <span class="n">{{ summary.values()|sum }}</span></a>
+  {% for s in ['Not Run','Pass','Fail','Blocked','Skip'] %}
+  <a class="tab {{ 'active' if f.state == s }}" href="{{ url_for('qa_test_cases', state=s) }}">{{ s }} <span class="n">{{ summary[s] }}</span></a>
+  {% endfor %}
+</div>
+<form method="get" class="filter-bar">
+  {% if f.state %}<input type="hidden" name="state" value="{{ f.state }}">{% endif %}
+  <div class="search-box"><input class="form-control" name="search" placeholder="Search…" value="{{ f.search }}"></div>
+  <select name="module" class="form-control" onchange="this.form.submit()"><option value="">All modules</option>
+    {% for m in modules %}<option {{ 'selected' if f.module == m }}>{{ m }}</option>{% endfor %}</select>
+  <select name="priority" class="form-control" onchange="this.form.submit()"><option value="">All priorities</option>
+    {% for p in PRIORITIES %}<option {{ 'selected' if f.priority == p }}>{{ p }}</option>{% endfor %}</select>
+  <button class="btn btn-outline" type="submit">Search</button>
+</form>
+<div class="card"><div class="table-wrap"><table>
+  <thead><tr><th>ID</th><th>Title</th><th>Module</th><th>Priority</th><th>Due</th><th>Result</th><th>Open bugs</th><th></th></tr></thead>
+  <tbody>
+  {% for t in cases %}
+    <tr>
+      <td class="mono">TC-{{ '%03d'|format(t.id) }}</td>
+      <td><a class="link-strong" href="{{ url_for('tc_view', tc_id=t.id) }}">{{ t.title|truncate(60) }}</a></td>
+      <td><span class="module-tag">{{ t.module }}</span></td>
+      <td>{{ sev_badge(t.priority) }}</td>
+      <td class="small muted nowrap">{{ t.due_date|d if t.due_date else '—' }}</td>
+      <td>{{ result_badge(t.last_status) }}</td>
+      <td class="small">{{ t.open_bugs or '—' }}</td>
+      <td><div class="actions"><a class="btn btn-xs btn-accent" href="{{ url_for('qa_execute', tc_id=t.id) }}">{{ 'Re-test' if t.last_status else 'Run' }}</a></div></td>
+    </tr>
+  {% else %}<tr><td colspan="8" class="empty-inline">No test cases here. The admin assigns work to you, or create your own.</td></tr>{% endfor %}
+  </tbody></table></div></div>
+{% endblock %}

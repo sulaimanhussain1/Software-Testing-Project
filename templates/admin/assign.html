@@ -1,0 +1,79 @@
+{% extends "layout.html" %}
+{% from "macros.html" import csrf, sev_badge, status_badge, result_badge, icon with context %}
+{% block page_title %}Assign Work{% endblock %}
+{% block page_subtitle %}Give bugs to developers and test cases to QA testers{% endblock %}
+{% block content %}
+<div class="tabs">
+  <a class="tab {{ 'active' if not show_all }}" href="{{ url_for('admin_assign') }}">Needs assignment</a>
+  <a class="tab {{ 'active' if show_all }}" href="{{ url_for('admin_assign', show='all') }}">Show all (re-assign)</a>
+</div>
+
+<div class="section-title">Bugs → Developers <span class="n">{{ bugs|length }}</span></div>
+<div class="card mb">
+  <form method="post" action="{{ url_for('admin_assign_bugs') }}">
+    {{ csrf() }}
+    <div class="table-wrap"><table>
+      <thead><tr><th class="chk"><input type="checkbox" onclick="toggleAll(this,'ids')" aria-label="Select all"></th>
+        <th>Bug</th><th>Module</th><th>Severity</th><th>Status</th><th>Reported by</th><th>Developer</th></tr></thead>
+      <tbody>
+      {% for b in bugs %}
+        <tr>
+          <td class="chk"><input type="checkbox" name="ids" value="{{ b.id }}" class="ids_b"></td>
+          <td><span class="mono">{{ b.bug_code }}</span><br><a class="link-strong" href="{{ url_for('bug_detail', bug_id=b.id) }}">{{ b.title|truncate(55) }}</a></td>
+          <td><span class="module-tag">{{ b.module }}</span></td>
+          <td>{{ sev_badge(b.severity) }}</td>
+          <td>{{ status_badge(b.status) }}</td>
+          <td class="small muted">{{ b.reporter or '—' }}</td>
+          <td class="small">{{ b.developer or '— unassigned —' }}</td>
+        </tr>
+      {% else %}<tr><td colspan="7" class="empty-inline">🎉 Every open bug has a developer.</td></tr>{% endfor %}
+      </tbody></table></div>
+    {% if bugs %}
+    <div class="bulkbar">
+      <label for="dev_pick">Assign selected to</label>
+      <select id="dev_pick" name="user_id" class="form-control" required>
+        <option value="">Choose developer…</option>
+        {% for d in dev_load %}<option value="{{ d.id }}">{{ d.full_name }} — {{ d.active }} active</option>{% endfor %}
+      </select>
+      <button class="btn btn-accent btn-sm" type="submit">{{ icon('assign') }} Assign bugs</button>
+    </div>
+    {% endif %}
+  </form>
+</div>
+
+<div class="section-title">Test cases → QA testers <span class="n">{{ tcs|length }}</span></div>
+<div class="card mb">
+  <form method="post" action="{{ url_for('admin_assign_tcs') }}">
+    {{ csrf() }}
+    <div class="table-wrap"><table>
+      <thead><tr><th class="chk"><input type="checkbox" onclick="toggleAll(this,'ids')" aria-label="Select all"></th>
+        <th>ID</th><th>Test case</th><th>Module</th><th>Priority</th><th>Latest result</th><th>Assigned QA</th><th>Due</th></tr></thead>
+      <tbody>
+      {% for t in tcs %}
+        <tr>
+          <td class="chk"><input type="checkbox" name="ids" value="{{ t.id }}"></td>
+          <td class="mono">TC-{{ '%03d'|format(t.id) }}</td>
+          <td><a class="link-strong" href="{{ url_for('tc_view', tc_id=t.id) }}">{{ t.title|truncate(60) }}</a></td>
+          <td><span class="module-tag">{{ t.module }}</span></td>
+          <td>{{ sev_badge(t.priority) }}</td>
+          <td>{{ result_badge(t.last_status) }}</td>
+          <td class="small">{{ t.qa_name or '— unassigned —' }}</td>
+          <td class="small muted">{{ t.due_date|d if t.due_date else '—' }}</td>
+        </tr>
+      {% else %}<tr><td colspan="8" class="empty-inline">All test cases are assigned.</td></tr>{% endfor %}
+      </tbody></table></div>
+    {% if tcs %}
+    <div class="bulkbar">
+      <label for="qa_pick">Assign selected to</label>
+      <select id="qa_pick" name="user_id" class="form-control" required>
+        <option value="">Choose QA tester…</option>
+        {% for q in qa_load %}<option value="{{ q.id }}">{{ q.full_name }} — {{ q.pending }} pending</option>{% endfor %}
+      </select>
+      <label for="due">Due date</label>
+      <input id="due" type="date" name="due_date" class="form-control" style="min-width:150px">
+      <button class="btn btn-accent btn-sm" type="submit">{{ icon('assign') }} Assign test cases</button>
+    </div>
+    {% endif %}
+  </form>
+</div>
+{% endblock %}

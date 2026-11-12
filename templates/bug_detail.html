@@ -1,0 +1,138 @@
+{% extends "layout.html" %}
+{% from "macros.html" import csrf, sev_badge, status_badge, files, upload_field, icon with context %}
+{% set role = g.user.role %}
+{% set back = url_for({'admin': 'admin_bugs', 'qa': 'qa_bugs', 'dev': 'dev_bugs'}[role]) %}
+{% block page_title %}{{ bug.bug_code }}{% endblock %}
+{% block page_subtitle %}{{ bug.title }}{% endblock %}
+{% block page_action %}<a href="{{ back }}" class="topbar-btn btn-ghost">{{ icon('back') }} Back to list</a>{% endblock %}
+
+{% block content %}
+
+{% set order = ['New', 'Assigned', 'In Progress', 'Fixed', 'Closed'] %}
+{% set cur = {'New':0,'Assigned':1,'In Progress':2,'Fixed':3,'Reopened':1,'Closed':4}[bug.status] %}
+<div class="card mb"><div class="card-body" style="padding-bottom:12px">
+  <div class="flow">
+    {% for s in order %}
+      <div class="flow-step {{ 'now' if loop.index0 == cur and bug.status != 'Reopened' else 'done' if loop.index0 < cur or (loop.index0 == cur and bug.status == 'Closed') else '' }}
+           {{ 'bad' if bug.status == 'Reopened' and s == 'Assigned' }}">
+        {{ 'Reopened' if bug.status == 'Reopened' and s == 'Assigned' else s }}</div>
+    {% endfor %}
+  </div>
+</div></div>
+
+<div class="detail-grid">
+  <div class="stack">
+
+    
+    {% if perms.assign %}
+    <div class="action-panel">
+      <h4>{{ icon('assign') }} {{ 'Assign to a developer' if not bug.assigned_to else 'Re-assign developer' }}</h4>
+      <form method="post" action="{{ url_for('bug_action', bug_id=bug.id, action='assign') }}">
+        {{ csrf() }}
+        <div class="form-grid">
+          <div class="form-group"><label>Developer</label>
+            <select class="form-control" name="user_id" required><option value="">Choose…</option>
+              {% for d in devs %}<option value="{{ d.id }}" {{ 'selected' if bug.assigned_to == d.id }}>{{ d.full_name }}</option>{% endfor %}</select></div>
+          <div class="form-group"><label>Note for developer (optional)</label>
+            <input class="form-control" name="comment" placeholder="e.g. please fix before Friday"></div>
+        </div>
+        <div class="btn-row"><button class="btn btn-accent" type="submit">{{ 'Assign' if not bug.assigned_to else 'Re-assign' }}</button></div>
+      </form>
+    </div>
+    {% endif %}
+
+    {% if perms.start or perms.fix %}
+    <div class="action-panel fix">
+      <h4>🛠 Developer actions</h4>
+      {% if bug.status == 'Reopened' %}<div class="block red small" style="margin-bottom:12px">This bug was <b>reopened</b> by QA – read their latest comment below before fixing again.</div>{% endif %}
+      {% if perms.start %}
+      <form method="post" action="{{ url_for('bug_action', bug_id=bug.id, action='start') }}" style="margin-bottom:14px">{{ csrf() }}
+        <button class="btn btn-warn" type="submit">▶ Start working (mark In Progress)</button></form>
+      {% endif %}
+      <form method="post" enctype="multipart/form-data" action="{{ url_for('bug_action', bug_id=bug.id, action='fix') }}">
+        {{ csrf() }}
+        <div class="form-group" style="margin-bottom:12px"><label>What did you fix? *</label>
+          <textarea class="form-control" name="comment" rows="4" required placeholder="Explain the root cause and what you changed so QA can re-test…"></textarea></div>
+        {{ upload_field('Upload proof (screenshot, log, patch, build link file)') }}
+        <div class="btn-row"><button class="btn btn-fix btn-big" type="submit">✓ Mark as Fixed</button></div>
+      </form>
+    </div>
+    {% endif %}
+
+    {% if perms.close or perms.reopen %}
+    <div class="action-panel verify">
+      <h4>🔍 {{ 'Verify the fix' if bug.status == 'Fixed' else 'Closed bug' }}</h4>
+      <form method="post" enctype="multipart/form-data" id="verifyForm">
+        {{ csrf() }}
+        <div class="form-group" style="margin-bottom:12px"><label>Comment <span class="muted">(required to reopen)</span></label>
+          <textarea class="form-control" name="comment" rows="3" placeholder="Re-tested on build … Works / still failing because…"></textarea></div>
+        {{ upload_field('Upload re-test evidence (optional)') }}
+        <div class="btn-row">
+          {% if perms.close %}<button class="btn btn-close btn-big" type="submit" formaction="{{ url_for('bug_action', bug_id=bug.id, action='close') }}">✓ Close bug</button>{% endif %}
+          {% if perms.reopen %}<button class="btn btn-reopen btn-big" type="submit" formaction="{{ url_for('bug_action', bug_id=bug.id, action='reopen') }}">↻ Reopen</button>{% endif %}
+        </div>
+      </form>
+    </div>
+    {% endif %}
+
+    
+    <div class="card">
+      <div class="card-header"><div class="card-title">Bug report</div>{{ sev_badge(bug.severity) }}</div>
+      <div class="card-body">
+        <div class="h-sub">Steps to reproduce</div><div class="block pre">{{ bug.steps or '—' }}</div>
+        <div class="h-sub">Expected result</div><div class="block green pre">{{ bug.expected or '—' }}</div>
+        <div class="h-sub">Actual result</div><div class="block red pre">{{ bug.actual or '—' }}</div>
+        {% if report_files %}<div class="h-sub">QA evidence</div>{{ files(report_files) }}{% endif %}
+      </div>
+    </div>
+
+    
+    <div class="card">
+      <div class="card-header"><div class="card-title">Activity &amp; comments</div></div>
+      <div class="card-body">
+        <div class="events">
+        {% for ev in events %}
+          <div class="event k-{{ ev.kind }}">
+            <div class="ev-ico ev-{{ ev.kind }}">{{ ev.full_name|initials if ev.full_name else '?' }}</div>
+            <div class="ev-body">
+              <div class="ev-head"><b>{{ ev.full_name or 'Deleted user' }}</b>
+                <span class="what">{{ {'reported':'reported this bug','assigned':'assigned this bug','started':'started working on it','fixed':'marked it FIXED','closed':'CLOSED the bug','reopened':'REOPENED the bug','comment':'commented'}[ev.kind] }}{% if ev.kind == 'assigned' %} → <b>{{ ev.body|replace('Assigned to ', '') }}</b>{% endif %}</span>
+                <time>{{ ev.created_at|dt }}</time></div>
+              {% if ev.body and ev.kind not in ['reported', 'assigned', 'started'] %}<div class="ev-text">{{ ev.body }}</div>{% endif %}
+              {{ files(by_event.get(ev.id)) }}
+            </div>
+          </div>
+        {% endfor %}
+        </div>
+
+        <form method="post" enctype="multipart/form-data" action="{{ url_for('bug_action', bug_id=bug.id, action='comment') }}" style="border-top:1px solid var(--border-light);padding-top:16px">
+          {{ csrf() }}
+          <div class="form-group" style="margin-bottom:10px"><label>Add a comment</label>
+            <textarea class="form-control" name="comment" rows="2" placeholder="Write a comment…"></textarea></div>
+          {{ upload_field('Attach files (optional)') }}
+          <div class="btn-row"><button class="btn btn-outline" type="submit">Post comment</button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  
+  <div class="stack">
+    <div class="card"><div class="card-body"><dl class="kv">
+      <dt>Status</dt><dd>{{ status_badge(bug.status) }}{% if bug.reopen_count %} <span class="muted small">reopened {{ bug.reopen_count }}×</span>{% endif %}</dd>
+      <dt>Severity</dt><dd>{{ sev_badge(bug.severity) }}</dd>
+      <dt>Module</dt><dd><span class="module-tag">{{ bug.module }}</span></dd>
+      <dt>Build</dt><dd>{{ bug.build or '—' }}</dd>
+      <dt>Reported by</dt><dd>{{ bug.reporter or '—' }}</dd>
+      <dt>Developer</dt><dd>{% if bug.developer %}<span class="avatar-sm">{{ bug.developer|initials }}</span>{{ bug.developer }}{% else %}<span class="muted">Not assigned</span>{% endif %}</dd>
+      {% if bug.assigner %}<dt>Assigned by</dt><dd>{{ bug.assigner }}</dd>{% endif %}
+      <dt>Reported</dt><dd>{{ bug.created_at|dt }}</dd>
+      <dt>Assigned</dt><dd>{{ bug.assigned_at|dt }}</dd>
+      <dt>Fixed</dt><dd>{{ bug.fixed_at|dt }}</dd>
+      <dt>Closed</dt><dd>{{ bug.closed_at|dt }}</dd>
+      {% if bug.test_case_id and role != 'dev' %}<dt>Test case</dt><dd><a href="{{ url_for('tc_view', tc_id=bug.test_case_id) }}">TC-{{ '%03d'|format(bug.test_case_id) }}</a><br><span class="muted small">{{ bug.tc_title }}</span></dd>{% endif %}
+      {% if bug.test_case_id and role == 'dev' %}<dt>Test case</dt><dd>TC-{{ '%03d'|format(bug.test_case_id) }}<br><span class="muted small">{{ bug.tc_title }}</span></dd>{% endif %}
+    </dl></div></div>
+  </div>
+</div>
+{% endblock %}

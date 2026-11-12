@@ -1,0 +1,19 @@
+{% extends "layout.html" %}
+{% from "macros.html" import csrf with context %}
+{% block page_title %}Notifications{% endblock %}
+{% block page_subtitle %}Assignments, fixes and reopened bugs{% endblock %}
+{% block page_action %}
+  <form method="post" action="{{ url_for('notifications_read_all') }}">{{ csrf() }}
+    <button class="topbar-btn btn-ghost" type="submit">Mark all read</button></form>
+{% endblock %}
+{% block content %}
+<div class="card">
+  {% for n in rows %}
+    <a class="notif {{ 'unread' if not n.is_read else 'read' }}" href="{{ url_for('notification_go', nid=n.id) }}">
+      <span class="dot"></span><span>{{ n.message }}</span><time>{{ n.created_at|dt }}</time>
+    </a>
+  {% else %}
+    <div class="empty-inline">You're all caught up — no notifications yet.</div>
+  {% endfor %}
+</div>
+{% endblock %}

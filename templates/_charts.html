@@ -1,0 +1,56 @@
+<script>
+const C = {
+  New:'#94a3b8', Assigned:'#6366f1', 'In Progress':'#f59e0b', Fixed:'#06b6d4', Reopened:'#ef4444', Closed:'#22c55e',
+  Critical:'#ef4444', High:'#f97316', Medium:'#eab308', Low:'#22c55e',
+  Pass:'#22c55e', Fail:'#ef4444', Blocked:'#f59e0b', Skip:'#9ca3af', 'Not Run':'#cbd5e1'
+};
+const tip = { backgroundColor:'#1e293b', cornerRadius:8, padding:10 };
+const donutText = {
+  id: 'donutText',
+  afterDatasetsDraw(chart, _a, opts) {
+    if (!opts || !opts.total) return;
+    const { ctx } = chart, meta = chart.getDatasetMeta(0);
+    ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    // count on every slice
+    meta.data.forEach((arc, i) => {
+      const v = chart.data.datasets[0].data[i]; if (!v) return;
+      const p = arc.getCenterPoint();
+      if (arc.endAngle - arc.startAngle < 0.28) return;   // too thin to fit a number
+      ctx.fillStyle = '#fff'; ctx.font = '700 13px Inter, sans-serif'; ctx.fillText(v, p.x, p.y);
+    });
+    // total in the centre
+    const x = meta.data[0].x, y = meta.data[0].y;
+    ctx.fillStyle = cssVar('--text-primary'); ctx.font = '800 26px Inter, sans-serif'; ctx.fillText(opts.total, x, y - 6);
+    ctx.fillStyle = cssVar('--text-muted'); ctx.font = '600 11px Inter, sans-serif'; ctx.fillText(opts.label || 'Total', x, y + 16);
+    ctx.restore();
+  }
+};
+function donut(id, obj, centerLabel) {
+  const el = document.getElementById(id); if (!el) return;
+  const labels = Object.keys(obj), data = Object.values(obj);
+  const total = data.reduce((a,b)=>a+b,0);
+  new Chart(el, { type:'doughnut', plugins:[donutText],
+    data:{ labels, datasets:[{ data: total? data : [1], backgroundColor: total? labels.map(l=>C[l]) : ['#e5e7eb'], borderWidth:2, borderColor: () => cssVar('--bg-card') }] },
+    options:{ cutout:'62%', maintainAspectRatio:false, plugins:{
+      donutText:{ total: total, label: centerLabel || 'Total' },
+      legend:{ position:'bottom', labels:{ boxWidth:10, boxHeight:10, usePointStyle:true, font:{size:11},
+        generateLabels: ch => labels.map((l,i) => ({ text: l + ': ' + data[i], fillStyle: C[l], strokeStyle: C[l], pointStyle:'circle', index:i, hidden:false, fontColor: cssVar('--text-secondary') })) } },
+      tooltip: total? tip : {enabled:false} } } });
+}
+function bars(id, labels, data, colors, horizontal) {
+  const el = document.getElementById(id); if (!el) return;
+  new Chart(el, { type:'bar',
+    data:{ labels, datasets:[{ data, backgroundColor: colors, borderRadius:6, maxBarThickness:38 }] },
+    options:{ indexAxis: horizontal?'y':'x', maintainAspectRatio:false, plugins:{ legend:{display:false}, tooltip:tip },
+      scales:{ [horizontal?'x':'y']:{ beginAtZero:true, ticks:{ precision:0 }, grid:{ color: () => cssVar('--chart-grid') } }, [horizontal?'y':'x']:{ grid:{display:false} } } } });
+}
+function trendChart(id, t, labelA, labelB) {
+  const el = document.getElementById(id); if (!el) return;
+  const ds = [{ label:labelA, data:t.reported, borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,.1)', fill:true, tension:.35, pointRadius:2 }];
+  if (labelB) ds.push({ label:labelB, data:t.closed, borderColor:'#22c55e', backgroundColor:'rgba(34,197,94,.1)', fill:true, tension:.35, pointRadius:2 });
+  new Chart(el, { type:'line', data:{ labels:t.labels, datasets:ds },
+    options:{ maintainAspectRatio:false, interaction:{mode:'index', intersect:false},
+      plugins:{ legend:{ position:'bottom', labels:{ boxWidth:10, usePointStyle:true, font:{size:11} } }, tooltip:tip },
+      scales:{ y:{ beginAtZero:true, ticks:{precision:0}, grid:{color: () => cssVar('--chart-grid')} }, x:{ grid:{display:false}, ticks:{ maxTicksLimit:7 } } } } });
+}
+</script>

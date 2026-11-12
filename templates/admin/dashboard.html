@@ -1,0 +1,92 @@
+{% extends "layout.html" %}
+{% from "macros.html" import status_badge, sev_badge, icon with context %}
+{% block page_title %}Admin Dashboard{% endblock %}
+{% block page_subtitle %}Whole-team overview · assign work and track progress{% endblock %}
+{% block page_action %}
+  <a href="{{ url_for('admin_assign') }}" class="topbar-btn btn-primary">{{ icon('assign') }} Assign Work</a>
+{% endblock %}
+
+{% block content %}
+<div class="stats-grid three">
+  <div class="stat-card"><div class="stat-label">Test Cases</div><div class="stat-value">{{ kpi.tc_total }}</div>
+    <div class="stat-sub">{{ kpi.tc_unassigned }} not assigned to QA</div></div>
+  <div class="stat-card"><div class="stat-label">Pass Rate</div><div class="stat-value" style="color:var(--pass)">{{ kpi.pass_rate }}%</div>
+    <div class="stat-sub">{{ tcs['Not Run'] }} test cases not run yet</div></div>
+  <div class="stat-card"><div class="stat-label">Open Bugs</div><div class="stat-value" style="color:var(--fail)">{{ kpi.bugs_open }}</div>
+    <div class="stat-sub">{{ kpi.reopened }} reopened</div></div>
+  <div class="stat-card {{ 'alert' if kpi.bugs_unassigned }}"><div class="stat-label">Waiting for Assignment</div>
+    <div class="stat-value">{{ kpi.bugs_unassigned }}</div>
+    <a class="stat-link" href="{{ url_for('admin_assign') }}">Assign now →</a></div>
+  <div class="stat-card {{ 'warn' if kpi.awaiting }}"><div class="stat-label">Awaiting QA Verify</div>
+    <div class="stat-value" style="color:#0891b2">{{ kpi.awaiting }}</div>
+    <div class="stat-sub">Fixed by developers</div></div>
+  <div class="stat-card"><div class="stat-label">Active Users</div><div class="stat-value">{{ kpi.users }}</div>
+    <a class="stat-link" href="{{ url_for('admin_users') }}">Manage users →</a></div>
+</div>
+
+<div class="grid-chart two">
+  <div class="card"><div class="card-header"><div class="card-title">Bugs by status</div></div>
+    <div class="card-body"><div class="chart-box"><canvas id="cStatus"></canvas></div></div></div>
+  <div class="card"><div class="card-header"><div class="card-title">Test case results</div></div>
+    <div class="card-body"><div class="chart-box"><canvas id="cTc"></canvas></div></div></div>
+  <div class="card"><div class="card-header"><div class="card-title">Open bugs by severity</div></div>
+    <div class="card-body"><div class="chart-box"><canvas id="cSev"></canvas></div></div></div>
+  <div class="card"><div class="card-header"><div class="card-title">Reported vs closed (14 days)</div></div>
+    <div class="card-body"><div class="chart-box"><canvas id="cTrend"></canvas></div></div></div>
+</div>
+
+<div class="grid-2 mb" style="align-items:start">
+  <div class="card">
+    <div class="card-header"><div class="card-title">Developer workload</div></div>
+    <div class="table-wrap"><table class="compact">
+      <thead><tr><th>Developer</th><th>Active</th><th>Awaiting QA</th><th>Closed</th><th>Reopens</th><th>Avg fix</th></tr></thead>
+      <tbody>
+      {% for d in devs %}
+        <tr><td><span class="avatar-sm">{{ d.full_name|initials }}</span>{{ d.full_name }}</td>
+          <td><b>{{ d.active }}</b></td><td>{{ d.awaiting }}</td><td>{{ d.closed }}</td><td>{{ d.reopens }}</td>
+          <td class="muted small">{{ '%.1f h'|format(d.avg_hours) if d.avg_hours is not none else '—' }}</td></tr>
+      {% else %}<tr><td colspan="6" class="empty-inline">No developers yet. <a href="{{ url_for('admin_user_new', role='dev') }}">Add one</a></td></tr>{% endfor %}
+      </tbody></table></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">QA workload</div></div>
+    <div class="table-wrap"><table class="compact">
+      <thead><tr><th>QA Tester</th><th>Assigned</th><th>Pending</th><th>Executed</th><th>Bugs reported</th></tr></thead>
+      <tbody>
+      {% for q in qas %}
+        <tr><td><span class="avatar-sm">{{ q.full_name|initials }}</span>{{ q.full_name }}</td>
+          <td>{{ q.assigned }}</td><td><b>{{ q.pending }}</b></td><td>{{ q.executed }}</td><td>{{ q.reported }}</td></tr>
+      {% else %}<tr><td colspan="5" class="empty-inline">No QA testers yet. <a href="{{ url_for('admin_user_new', role='qa') }}">Add one</a></td></tr>{% endfor %}
+      </tbody></table></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><div class="card-title">Recent activity</div><a class="btn btn-sm btn-outline" href="{{ url_for('admin_bugs') }}">All bugs</a></div>
+  <div class="card-body">
+    <div class="events">
+    {% for ev in activity %}
+      <div class="event">
+        <div class="ev-ico ev-{{ ev.kind }}">{{ ev.kind[0]|upper }}</div>
+        <div class="ev-body">
+          <div class="ev-head"><b>{{ ev.full_name or 'Someone' }}</b>
+            <span class="what">{{ ev.kind }} on</span>
+            <a class="link-strong" href="{{ url_for('bug_detail', bug_id=ev.bid) }}">{{ ev.bug_code }}</a>
+            <span class="muted">· {{ ev.title|truncate(60) }}</span><time>{{ ev.created_at|dt }}</time></div>
+        </div>
+      </div>
+    {% else %}<div class="empty-inline">No activity yet.</div>{% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% include "_charts.html" %}
+<script>
+  donut('cStatus', {{ bug_status|tojson }});
+  donut('cTc', {{ tcs|tojson }});
+  bars('cSev', {{ bug_sev.keys()|list|tojson }}, {{ bug_sev.values()|list|tojson }}, ['#ef4444','#f97316','#eab308','#22c55e']);
+  trendChart('cTrend', {{ trend|tojson }}, 'Reported', 'Closed');
+</script>
+{% endblock %}

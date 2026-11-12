@@ -1,0 +1,57 @@
+{% extends "layout.html" %}
+{% from "macros.html" import sev_badge, status_badge, icon with context %}
+{% set ep = {'admin': 'admin_bugs', 'qa': 'qa_bugs', 'dev': 'dev_bugs'}[role] %}
+{% block page_title %}{{ {'admin': 'All Bugs', 'qa': 'Bugs & Verification', 'dev': 'My Bugs'}[role] }}{% endblock %}
+{% block page_subtitle %}{{ {'admin': 'Every bug in the system', 'qa': 'Verify fixed bugs – close them or reopen', 'dev': 'Bugs assigned to you'}[role] }}{% endblock %}
+{% block page_action %}
+  {% if role == 'qa' %}<a href="{{ url_for('qa_bug_new') }}" class="topbar-btn btn-primary">{{ icon('plus') }} Report Bug</a>{% endif %}
+  {% if role != 'dev' %}<a href="{{ url_for('reports_export', type='bugs') }}" class="topbar-btn btn-ghost">{{ icon('download') }} Export</a>{% endif %}
+{% endblock %}
+{% block content %}
+<div class="tabs">
+  <a class="tab {{ 'active' if not f.status }}" href="{{ url_for(ep) }}">All <span class="n">{{ status_counts.values()|sum }}</span></a>
+  <a class="tab {{ 'active' if f.status == 'open' }}" href="{{ url_for(ep, status='open') }}">Open <span class="n">{{ status_counts.values()|sum - status_counts.Closed }}</span></a>
+  {% for s in BUG_STATUSES %}
+    {% if not (role == 'dev' and s == 'New') %}
+    <a class="tab {{ 'active' if f.status == s }}" href="{{ url_for(ep, status=s) }}">{{ s }} <span class="n">{{ status_counts[s] }}</span></a>
+    {% endif %}
+  {% endfor %}
+</div>
+<form method="get" class="filter-bar">
+  {% if f.status %}<input type="hidden" name="status" value="{{ f.status }}">{% endif %}
+  <div class="search-box"><input class="form-control" name="search" placeholder="Search bug id, title…" value="{{ f.search }}"></div>
+  <select name="severity" class="form-control" onchange="this.form.submit()"><option value="">All severities</option>
+    {% for s in SEVERITIES %}<option {{ 'selected' if f.severity == s }}>{{ s }}</option>{% endfor %}</select>
+  <select name="module" class="form-control" onchange="this.form.submit()"><option value="">All modules</option>
+    {% for m in modules %}<option {{ 'selected' if f.module == m }}>{{ m }}</option>{% endfor %}</select>
+  {% if role == 'admin' %}
+  <select name="dev" class="form-control" onchange="this.form.submit()"><option value="">Any developer</option>
+    <option value="none" {{ 'selected' if f.dev == 'none' }}>Unassigned</option>
+    {% for d in devs %}<option value="{{ d.id }}" {{ 'selected' if f.dev == d.id|string }}>{{ d.full_name }}</option>{% endfor %}</select>
+  {% elif role == 'qa' %}
+  <label class="check-row" style="margin:0"><input type="checkbox" name="mine" value="1" {{ 'checked' if f.mine == '1' }} onchange="this.form.submit()" style="accent-color:var(--accent)"> Reported by me</label>
+  {% endif %}
+  <button class="btn btn-outline" type="submit">Search</button>
+  {% if f.search or f.severity or f.module or f.dev or f.mine %}<a class="btn btn-outline" href="{{ url_for(ep, status=f.status or None) }}">Clear</a>{% endif %}
+</form>
+
+<div class="card"><div class="table-wrap"><table>
+  <thead><tr><th>Bug</th><th>Module</th><th>Severity</th><th>Status</th>
+    {% if role != 'dev' %}<th>Developer</th>{% endif %}<th>Reported by</th><th>Updated</th><th></th></tr></thead>
+  <tbody>
+  {% for b in bugs %}
+    <tr class="{{ 'row-danger' if b.status == 'Reopened' else 'row-warn' if (b.status == 'Fixed' and role == 'qa') or (b.status == 'New' and role == 'admin') }}">
+      <td><span class="mono">{{ b.bug_code }}</span>{% if b.reopen_count %} <span class="muted small">↻{{ b.reopen_count }}</span>{% endif %}<br>
+        <a class="link-strong" href="{{ url_for('bug_detail', bug_id=b.id) }}">{{ b.title|truncate(62) }}</a></td>
+      <td><span class="module-tag">{{ b.module }}</span></td>
+      <td>{{ sev_badge(b.severity) }}</td>
+      <td>{{ status_badge(b.status) }}</td>
+      {% if role != 'dev' %}<td class="small">{{ b.developer or '—' }}</td>{% endif %}
+      <td class="small muted">{{ b.reporter or '—' }}</td>
+      <td class="small muted nowrap">{{ b.updated_at|dt }}</td>
+      <td><a class="btn btn-xs {{ 'btn-success' if b.status == 'Fixed' and role == 'qa' else 'btn-outline' }}" href="{{ url_for('bug_detail', bug_id=b.id) }}">
+        {{ 'Verify' if b.status == 'Fixed' and role == 'qa' else 'Open' }}</a></td>
+    </tr>
+  {% else %}<tr><td colspan="8" class="empty-inline">No bugs match these filters.</td></tr>{% endfor %}
+  </tbody></table></div></div>
+{% endblock %}

@@ -1,0 +1,34 @@
+{% extends "layout.html" %}
+{% from "macros.html" import csrf with context %}
+{% block page_title %}My Account{% endblock %}
+{% block page_subtitle %}{{ g.user.full_name }} · {{ ROLE_LABEL[g.user.role] }}{% endblock %}
+{% block content %}
+<div class="grid-2" style="align-items:start">
+  <div class="card">
+    <div class="card-header"><div class="card-title">Profile</div></div>
+    <div class="card-body">
+      <dl class="kv">
+        <dt>Name</dt><dd>{{ g.user.full_name }}</dd>
+        <dt>Username</dt><dd>{{ g.user.username }}</dd>
+        <dt>Role</dt><dd><span class="badge badge-{{ g.user.role }}">{{ ROLE_LABEL[g.user.role] }}</span></dd>
+        <dt>Last login</dt><dd>{{ g.user.last_login|dt }}</dd>
+      </dl>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">Change password</div></div>
+    <div class="card-body">
+      <form method="post">
+        {{ csrf() }}
+        <div class="form-group" style="margin-bottom:14px"><label>Current password</label>
+          <input class="form-control" type="password" name="current" required autocomplete="current-password"></div>
+        <div class="form-group" style="margin-bottom:14px"><label>New password</label>
+          <input class="form-control" type="password" name="new" minlength="6" required autocomplete="new-password"></div>
+        <div class="form-group" style="margin-bottom:14px"><label>Confirm new password</label>
+          <input class="form-control" type="password" name="confirm" minlength="6" required autocomplete="new-password"></div>
+        <button class="btn btn-accent" type="submit">Update password</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

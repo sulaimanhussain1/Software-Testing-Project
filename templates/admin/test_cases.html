@@ -1,0 +1,45 @@
+{% extends "layout.html" %}
+{% from "macros.html" import csrf, sev_badge, result_badge, icon with context %}
+{% block page_title %}Test Cases{% endblock %}
+{% block page_subtitle %}Create test cases and assign them to QA testers{% endblock %}
+{% block page_action %}
+  <a href="{{ url_for('reports_export', type='test_cases') }}" class="topbar-btn btn-ghost">{{ icon('download') }} Export</a>
+  <a href="{{ url_for('tc_new') }}" class="topbar-btn btn-primary">{{ icon('plus') }} New Test Case</a>
+{% endblock %}
+{% block content %}
+<form method="get" class="filter-bar">
+  <div class="search-box"><input class="form-control" name="search" placeholder="Search test cases…" value="{{ f.search }}"></div>
+  <select name="module" class="form-control" onchange="this.form.submit()"><option value="">All modules</option>
+    {% for m in modules %}<option {{ 'selected' if f.module == m }}>{{ m }}</option>{% endfor %}</select>
+  <select name="priority" class="form-control" onchange="this.form.submit()"><option value="">All priorities</option>
+    {% for p in PRIORITIES %}<option {{ 'selected' if f.priority == p }}>{{ p }}</option>{% endfor %}</select>
+  <select name="state" class="form-control" onchange="this.form.submit()"><option value="">Any result</option>
+    {% for s in ['Not Run'] + EXEC_STATUSES %}<option {{ 'selected' if f.state == s }}>{{ s }}</option>{% endfor %}</select>
+  <select name="qa" class="form-control" onchange="this.form.submit()"><option value="">Any QA</option>
+    <option value="none" {{ 'selected' if f.qa == 'none' }}>Unassigned</option>
+    {% for q in qas %}<option value="{{ q.id }}" {{ 'selected' if f.qa == q.id|string }}>{{ q.full_name }}</option>{% endfor %}</select>
+  <button class="btn btn-outline" type="submit">Search</button>
+  {% if f.search or f.module or f.priority or f.state or f.qa %}<a class="btn btn-outline" href="{{ url_for('admin_test_cases') }}">Clear</a>{% endif %}
+</form>
+<div class="card"><div class="table-wrap"><table>
+  <thead><tr><th>ID</th><th>Title</th><th>Module</th><th>Priority</th><th>Assigned QA</th><th>Due</th><th>Latest result</th><th>Bugs</th><th>Actions</th></tr></thead>
+  <tbody>
+  {% for t in cases %}
+    <tr>
+      <td class="mono">TC-{{ '%03d'|format(t.id) }}</td>
+      <td><a class="link-strong" href="{{ url_for('tc_view', tc_id=t.id) }}">{{ t.title|truncate(60) }}</a></td>
+      <td><span class="module-tag">{{ t.module }}</span></td>
+      <td>{{ sev_badge(t.priority) }}</td>
+      <td class="small">{% if t.qa_name %}<span class="avatar-sm">{{ t.qa_name|initials }}</span>{{ t.qa_name }}{% else %}<span class="muted">— unassigned —</span>{% endif %}</td>
+      <td class="small muted nowrap">{{ t.due_date|d if t.due_date else '—' }}</td>
+      <td>{{ result_badge(t.last_status) }}</td>
+      <td class="small">{{ t.open_bugs or '—' }}</td>
+      <td><div class="actions">
+        <a class="btn btn-xs btn-outline" href="{{ url_for('tc_edit', tc_id=t.id) }}">Edit</a>
+        <form method="post" action="{{ url_for('tc_delete', tc_id=t.id) }}" class="inline-form" data-confirm="Delete this test case and its execution history?">
+          {{ csrf() }}<button class="btn btn-xs btn-danger" type="submit">Delete</button></form>
+      </div></td>
+    </tr>
+  {% else %}<tr><td colspan="9" class="empty-inline">No test cases match.</td></tr>{% endfor %}
+  </tbody></table></div></div>
+{% endblock %}

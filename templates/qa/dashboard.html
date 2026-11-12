@@ -1,0 +1,57 @@
+{% extends "layout.html" %}
+{% from "macros.html" import sev_badge, status_badge, icon with context %}
+{% block page_title %}QA Dashboard{% endblock %}
+{% block page_subtitle %}Hello {{ g.user.full_name.split()[0] }} · your assigned tests and bug verification{% endblock %}
+{% block page_action %}
+  <a href="{{ url_for('qa_bug_new') }}" class="topbar-btn btn-ghost">{{ icon('plus') }} Report Bug</a>
+  <a href="{{ url_for('qa_test_cases') }}" class="topbar-btn btn-primary">My Test Cases</a>
+{% endblock %}
+{% block content %}
+<div class="stats-grid">
+  <div class="stat-card"><div class="stat-label">Assigned to me</div><div class="stat-value">{{ total_tc }}</div>
+    <div class="stat-sub">{{ tcs['Not Run'] }} still to run</div></div>
+  <div class="stat-card"><div class="stat-label">My pass rate</div><div class="stat-value" style="color:var(--pass)">{{ rate }}%</div>
+    <div class="stat-sub">{{ tcs.Pass }} pass · {{ tcs.Fail }} fail</div></div>
+  <div class="stat-card {{ 'warn' if verify_count }}"><div class="stat-label">Fixed – verify now</div>
+    <div class="stat-value" style="color:#0891b2">{{ verify_count }}</div>
+    <a class="stat-link" href="{{ url_for('qa_bugs', status='Fixed') }}">Close or reopen →</a></div>
+  <div class="stat-card {{ 'alert' if reopened }}"><div class="stat-label">My reopened bugs</div>
+    <div class="stat-value" style="color:var(--fail)">{{ reopened }}</div>
+    <div class="stat-sub">{{ mine.New + mine.Assigned + mine['In Progress'] }} waiting on developers</div></div>
+</div>
+
+<div class="grid-2 mb" style="align-items:start">
+  <div class="card">
+    <div class="card-header"><div class="card-title">Next test cases to run</div><a class="btn btn-sm btn-outline" href="{{ url_for('qa_test_cases') }}">All</a></div>
+    <div class="table-wrap"><table><tbody>
+    {% for t in todo %}
+      <tr><td class="mono">TC-{{ '%03d'|format(t.id) }}</td>
+        <td><a class="link-strong" href="{{ url_for('tc_view', tc_id=t.id) }}">{{ t.title|truncate(46) }}</a>
+          <div class="muted small">{{ t.module }}{% if t.due_date %} · due {{ t.due_date|d }}{% endif %}</div></td>
+        <td>{{ sev_badge(t.priority) }}</td>
+        <td><a class="btn btn-xs btn-accent" href="{{ url_for('qa_execute', tc_id=t.id) }}">Run</a></td></tr>
+    {% else %}<tr><td class="empty-inline">Nothing pending – nice work!</td></tr>{% endfor %}
+    </tbody></table></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">Waiting for my verification</div><a class="btn btn-sm btn-outline" href="{{ url_for('qa_bugs', status='Fixed') }}">All</a></div>
+    <div class="table-wrap"><table><tbody>
+    {% for b in to_verify %}
+      <tr><td class="mono">{{ b.bug_code }}</td>
+        <td><a class="link-strong" href="{{ url_for('bug_detail', bug_id=b.id) }}">{{ b.title|truncate(42) }}</a>
+          <div class="muted small">Fixed by {{ b.developer or '—' }} · {{ b.fixed_at|dt }}</div></td>
+        <td><a class="btn btn-xs btn-success" href="{{ url_for('bug_detail', bug_id=b.id) }}">Verify</a></td></tr>
+    {% else %}<tr><td class="empty-inline">No fixes waiting.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </div>
+</div>
+
+<div class="grid-chart">
+  <div class="card"><div class="card-header"><div class="card-title">My test results</div></div>
+    <div class="card-body"><div class="chart-box"><canvas id="cTc"></canvas></div></div></div>
+  <div class="card"><div class="card-header"><div class="card-title">Bugs I reported</div></div>
+    <div class="card-body"><div class="chart-box"><canvas id="cBug"></canvas></div></div></div>
+</div>
+{% endblock %}
+{% block scripts %}{% include "_charts.html" %}
+<script>donut('cTc', {{ tcs|tojson }}); donut('cBug', {{ mine|tojson }});</script>{% endblock %}

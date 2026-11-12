@@ -1,0 +1,33 @@
+{% extends "layout.html" %}
+{% from "macros.html" import csrf, icon with context %}
+{% block page_title %}{{ 'Edit User' if editing else 'New User' }}{% endblock %}
+{% block page_subtitle %}{{ 'Update account details or reset the password' if editing else 'The user logs in with these credentials' }}{% endblock %}
+{% block page_action %}<a href="{{ url_for('admin_users') }}" class="topbar-btn btn-ghost">{{ icon('back') }} Back</a>{% endblock %}
+{% block content %}
+<div class="card form-card" style="max-width:640px">
+  <div class="card-body">
+  <form method="post" autocomplete="off">
+    {{ csrf() }}
+    <div class="form-grid">
+      <div class="form-group"><label>Full name *</label>
+        <input class="form-control" name="full_name" value="{{ form.full_name or '' }}" required></div>
+      <div class="form-group"><label>Username *</label>
+        <input class="form-control" name="username" value="{{ form.username or '' }}" required pattern="[A-Za-z0-9._-]{3,30}" placeholder="e.g. ali.qa"></div>
+      <div class="form-group"><label>Role *</label>
+        <select class="form-control" name="role" required>
+          {% for r, label in [('qa','QA Tester'),('dev','Developer'),('admin','Administrator')] %}
+            <option value="{{ r }}" {{ 'selected' if form.role == r }}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <span class="form-hint">QA → runs tests &amp; verifies fixes · Developer → fixes assigned bugs · Admin → manages everything</span></div>
+      <div class="form-group"><label>{{ 'New password (leave blank to keep)' if editing else 'Password *' }}</label>
+        <input class="form-control" type="password" name="password" minlength="6" {{ '' if editing else 'required' }} autocomplete="new-password" placeholder="min 6 characters"></div>
+    </div>
+    <div class="form-actions" style="margin-top:20px;display:flex;gap:10px">
+      <button class="btn btn-accent" type="submit">{{ 'Save changes' if editing else 'Create user' }}</button>
+      <a class="btn btn-outline" href="{{ url_for('admin_users') }}">Cancel</a>
+    </div>
+  </form>
+  </div>
+</div>
+{% endblock %}
